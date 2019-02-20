@@ -22,7 +22,7 @@ function varargout = Main(varargin)
 
 % Edit the above text to modify the response to help Main
 
-% Last Modified by GUIDE v2.5 20-Feb-2019 16:15:25
+% Last Modified by GUIDE v2.5 20-Feb-2019 16:35:17
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -194,6 +194,10 @@ function pushbutton1_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
+% open('dblwaitbar.fig');
+% dblh=guihandles;
+% waitbar(0,'message', 'Parent', dblh.figure1,'WindowStyle','docked','Position',[1,1,100,10]);
+
 %% 初始化
 global filename_V pathname_V filename_O pathname_O filepath_Out canopreate;
 
@@ -209,10 +213,11 @@ end
 
 if canopreate(1)~=0 && canopreate(2)~=0 && canopreate(3)~=0
     allescap=0;
-    rat_son=0;
     rat_father=0;
-    h_son=waitbar(rat_son,'等待主进程...');
-    h_father=waitbar(rat_father,'参数初始化...');
+    rat_son=0;
+    h_father=waitbar(rat_father,'参数初始化...','WindowStyle','modal');
+    P_hf=get(h_father,'Position');
+    h_son=waitbar(rat_son,'等待主进程...','Position',[P_hf(1),P_hf(2)-P_hf(4)-20,P_hf(3),P_hf(4)]);
 
     %% 参数配置
     atime=0.5;                                              %进度条刷新周期
@@ -220,6 +225,7 @@ if canopreate(1)~=0 && canopreate(2)~=0 && canopreate(3)~=0
     cut_rat=str2double(get(handles.edit_Cut,'String'));     %纵向剪裁比率
     HrW=str2double(get(handles.edit_H,'String'))/str2double(get(handles.edit_W,'String'));  %显示比例
     outv_dtime=str2double(get(handles.edit_T,'String'));    %剪辑后视频最大时长
+    outv_dtimemin=str2double(get(handles.edit_Tmin,'String'));    %剪辑后视频最小时长
     oriv=VideoReader([pathname_V,filename_V]);              %视频文件
     option_data=importdata([pathname_O,filename_O]);        %配置文件
 
@@ -230,11 +236,13 @@ if canopreate(1)~=0 && canopreate(2)~=0 && canopreate(3)~=0
     set(handles.edit_H,'Enable','inactive');
     set(handles.edit_W,'Enable','inactive');
     set(handles.edit_T,'Enable','inactive');
+    set(handles.edit_Tmin,'Enable','inactive');
     set(handles.edit_Cut,'Enable','inactive');
     set(handles.edit_R,'Enable','inactive');
     set(handles.edit_H,'ForegroundColor',[0.5,0.5,0.5]);
     set(handles.edit_W,'ForegroundColor',[0.5,0.5,0.5]);
     set(handles.edit_T,'ForegroundColor',[0.5,0.5,0.5]);
+    set(handles.edit_Tmin,'ForegroundColor',[0.5,0.5,0.5]);
     set(handles.edit_Cut,'ForegroundColor',[0.5,0.5,0.5]);
     set(handles.edit_R,'ForegroundColor',[0.5,0.5,0.5]);
     set(handles.edit_V,'ForegroundColor',[0.5,0.5,0.5]);
@@ -276,10 +284,17 @@ if canopreate(1)~=0 && canopreate(2)~=0 && canopreate(3)~=0
         if end_time(i)-start_time(i)>=outv_dtime
             outv_fps=outv_fs/outv_dtime;
         else
-            outv_fps=outv_fs/(end_time(i)-start_time(i));
+            if end_time(i)-start_time(i)<=outv_dtimemin
+                outv_fps=outv_fs/outv_dtimemin;
+            else
+                outv_fps=outv_fs/(end_time(i)-start_time(i));
+            end
         end
-
-        outv = VideoWriter([filepath_Out,'\',datainfo,'\',num2str(i),'.avi']);
+        
+        if exist([filepath_Out,'\',dateinfo],'dir')==0
+            mkdir([filepath_Out,'\',dateinfo]);
+        end
+        outv = VideoWriter([filepath_Out,'\',dateinfo,'\',num2str(i)],'MPEG-4');
         outv.FrameRate = outv_fps;
         open(outv);
         oriv.CurrentTime = start_time(i);
@@ -289,6 +304,9 @@ if canopreate(1)~=0 && canopreate(2)~=0 && canopreate(3)~=0
         escap=0;
         thiscap=0;
         for j=1:outv_fs
+            P_hf=get(h_father,'Position');
+            set(h_son,'Position',[P_hf(1),P_hf(2)-P_hf(4)-20,P_hf(3),P_hf(4)]);
+            
             rat_son=(j-1)/outv_fs;
             thistime=toc; tic;
             thiscap=thiscap+thistime;
@@ -331,11 +349,13 @@ if canopreate(1)~=0 && canopreate(2)~=0 && canopreate(3)~=0
     set(handles.edit_H,'Enable','on');
     set(handles.edit_W,'Enable','on');
     set(handles.edit_T,'Enable','on');
+    set(handles.edit_Tmin,'Enable','on');
     set(handles.edit_Cut,'Enable','on');
     set(handles.edit_R,'Enable','on');
     set(handles.edit_H,'ForegroundColor',[0,0,0]);
     set(handles.edit_W,'ForegroundColor',[0,0,0]);
     set(handles.edit_T,'ForegroundColor',[0,0,0]);
+    set(handles.edit_Tmin,'ForegroundColor',[0,0,0]);
     set(handles.edit_Cut,'ForegroundColor',[0,0,0]);
     set(handles.edit_R,'ForegroundColor',[0,0,0]);
     set(handles.edit_V,'ForegroundColor',[0,0,0]);
@@ -418,7 +438,7 @@ function pushbutton_selectV_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 global filename_V pathname_V canopreate
 [filename_V,pathname_V]=uigetfile({'*.mp4';'*.avi';'*.mkv'},'请选择原视频文件');
-if filename_V~=0 || pathname_V~=0 
+if length(pathname_V)~=1 
     set(handles.edit_V,'String',filename_V);
     set(handles.edit_V,'ForegroundColor',[0,0,0]);
     canopreate(1)=1;
@@ -431,7 +451,7 @@ function pushbutton_selectO_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 global filename_O pathname_O canopreate
 [filename_O,pathname_O]=uigetfile({'*.txt'},'请选择配置文件');
-if filename_O~=0 || pathname_O~=0 
+if length(pathname_O)~=1 
     set(handles.edit_Ttable,'String',filename_O);
     set(handles.edit_Ttable,'ForegroundColor',[0,0,0]);
     canopreate(2)=1;
@@ -467,9 +487,9 @@ function pushbutton_Out_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 global filepath_Out canopreate
 filepath_Out = uigetdir('*.*','请选择输出文件夹');
-if filepath_Out~=0
+if length(filepath_Out)~=1
     set(handles.edit_Out,'String',filepath_Out);
-    set(handles.edit_Ttable,'ForegroundColor',[0,0,0]);
+    set(handles.edit_Out,'ForegroundColor',[0,0,0]);
     canopreate(3)=1;
 end
 
@@ -482,3 +502,26 @@ function figure1_CreateFcn(hObject, eventdata, handles)
 
 global canopreate
 canopreate=zeros(1,3);
+
+
+
+function edit_Tmin_Callback(hObject, eventdata, handles)
+% hObject    handle to edit_Tmin (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+% Hints: get(hObject,'String') returns contents of edit_Tmin as text
+%        str2double(get(hObject,'String')) returns contents of edit_Tmin as a double
+
+
+% --- Executes during object creation, after setting all properties.
+function edit_Tmin_CreateFcn(hObject, eventdata, handles)
+% hObject    handle to edit_Tmin (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    empty - handles not created until after all CreateFcns called
+
+% Hint: edit controls usually have a white background on Windows.
+%       See ISPC and COMPUTER.
+if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
+    set(hObject,'BackgroundColor','white');
+end
